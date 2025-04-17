@@ -34,7 +34,7 @@ if "chunks" in st.session_state:
 
             context = "\n\n---\n\n".join(f"{c['text']}\n(Source: {c['source']})" for c in relevant)
 
-            model = genai.GenerativeModel("gemini-pro")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             response = model.generate_content(f"""You are a technical assistant for 3GPP standards.
 
 Use the context below to answer the question. Mention which document (source) it came from if relevant.
