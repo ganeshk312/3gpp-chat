@@ -1,36 +1,49 @@
 import streamlit as st
-import tempfile
 import os
-from utils import get_all_pdf_links, download_pdfs, build_or_load_index
+import tempfile
+import google.generativeai as genai
+from utils import get_all_pdf_links, download_pdfs, extract_text_chunks
 
-st.set_page_config(page_title="3GPP Spec Assistant (Gemini)", layout="wide")
-st.title("📡 3GPP Standards Chatbot (Powered by Google Gemini)")
+st.set_page_config(page_title="3GPP Spec Chatbot (Gemini)", layout="wide")
+st.title("📡 3GPP Standards Chatbot (Google Gemini)")
 
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+genai.configure(api_key=GEMINI_API_KEY)
 
-root_url = st.text_input("Enter 3GPP spec index root URL:", "https://your-3gpp-folder.com/")
-run = st.button("Build Knowledge Base")
+root_url = st.text_input("Enter root folder URL for 3GPP PDFs:")
+run = st.button("📄 Build Knowledge Base")
 
 if run:
-    with st.spinner("Crawling and indexing documents..."):
+    with st.spinner("Crawling and indexing PDF documents..."):
         pdf_links = get_all_pdf_links(root_url)
-        st.success(f"Found {len(pdf_links)} PDF documents.")
+        st.success(f"Found {len(pdf_links)} PDFs")
         with tempfile.TemporaryDirectory() as tmpdir:
             download_pdfs(pdf_links, tmpdir)
-            index = build_or_load_index(tmpdir)
-            st.session_state.index = index
-            st.success("Knowledge base is ready! You can now ask questions.")
+            chunks = extract_text_chunks(tmpdir)
+            st.session_state.chunks = chunks
+            st.success("✅ Documents loaded and indexed!")
 
-if "index" in st.session_state:
-    user_input = st.text_input("Ask a question about 3GPP standards:")
-    if user_input:
-        query_engine = st.session_state.index.as_query_engine(similarity_top_k=3)
-        response = query_engine.query(user_input)
-        st.write("### ✅ Answer:")
-        st.write(response.response)
+if "chunks" in st.session_state:
+    prompt = st.text_input("Ask your 3GPP question:")
+    if prompt:
+        with st.spinner("Thinking..."):
+            relevant = [
+                c for c in st.session_state.chunks
+                if any(word in c["text"].lower() for word in prompt.lower().split())
+            ][:5]
 
-        st.write("### 📎 Sources:")
-        for s in response.source_nodes:
-            st.markdown(f"- `{s.metadata.get('file_path')}` (Score: {s.score:.2f})")
+            context = "\n\n---\n\n".join(f"{c['text']}\n(Source: {c['source']})" for c in relevant)
 
+            model = genai.GenerativeModel("gemini-pro")
+            response = model.generate_content(f"""You are a technical assistant for 3GPP standards.
+
+Use the context below to answer the question. Mention which document (source) it came from if relevant.
+
+Context:
+{context}
+
+Question: {prompt}
+""")
+
+            st.write("### ✅ Answer")
+            st.write(response.text)
