@@ -35,7 +35,8 @@ if "chunks" in st.session_state:
             context = "\n\n---\n\n".join(f"{c['text']}\n(Source: {c['source']})" for c in relevant)
 
             model = genai.GenerativeModel("gemini-2.0-flash")
-            response = model.generate_content(f"""You are a technical assistant for 3GPP standards.
+            response = model.generate_content(f"""You are a technical assistant for 3GPP standards. You have expertise in AMF and few developers working on AMF will ask you questions. 
+            Give the answer from amf perspective. 
 
 Use the context below to answer the question. Mention which document (source) it came from if relevant.
 
@@ -43,6 +44,10 @@ Context:
 {context}
 
 Question: {prompt}
+Answer:<your answer to the question>
+
+Reference: <reference used>
+
 """)
 
             st.write("### ✅ Answer")
