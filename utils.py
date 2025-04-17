@@ -1,6 +1,7 @@
 import os
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 import fitz  # PyMuPDF
 
 def get_all_pdf_links(root_url):
@@ -19,13 +20,24 @@ def get_all_pdf_links(root_url):
             return
 
         soup = BeautifulSoup(r.text, 'html.parser')
+
         for link in soup.find_all('a', href=True):
             href = link['href']
-            if href.endswith('.pdf'):
-                full_link = requests.compat.urljoin(url, href)
-                pdf_links.append(full_link)
-            elif href.endswith('/') or href.endswith('.html'):
-                crawl(requests.compat.urljoin(url, href))
+
+            # Skip [To Parent Directory] or "../"
+            if href.strip() == "../" or "parent" in link.text.lower():
+                continue
+
+            full_url = urljoin(url, href)
+
+            # Make sure we stay under root_url
+            if not full_url.startswith(root_url):
+                continue
+
+            if href.endswith(".pdf"):
+                pdf_links.append(full_url)
+            elif href.endswith("/") or href.endswith(".html"):
+                crawl(full_url)
 
     crawl(root_url)
     return pdf_links
